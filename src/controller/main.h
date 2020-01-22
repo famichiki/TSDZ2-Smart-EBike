@@ -15,16 +15,16 @@
 
 
 // motor 
-#define PWM_CYCLES_COUNTER_MAX                                    3125    // 5 erps minimum speed -> 1/5 = 200 ms; 200 ms / 64 us = 3125
-#define PWM_CYCLES_SECOND                                         15625   // 1 / 64us(PWM period)
+#define PWM_CYCLES_COUNTER_MAX                                    3125  // 5 erps minimum speed -> 1/5 = 200 ms; 200 ms / 64 us = 3125
+#define PWM_CYCLES_SECOND                                         15625 // 1 / 64us(PWM period)
 #define PWM_DUTY_CYCLE_MAX                                        254
 #define MIDDLE_PWM_DUTY_CYCLE_MAX                                 (PWM_DUTY_CYCLE_MAX / 2)
 
-#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_DEFAULT               160     // 160 -> 160 * 64 us for every duty cycle increment
-#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN                   20      // 20 -> 20 * 64 us for every duty cycle increment
+#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_DEFAULT               160   // 160 -> 160 * 64 us for every duty cycle increment
+#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN                   20    // 20 -> 20 * 64 us for every duty cycle increment
 
-#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_DEFAULT             40      // 40 -> 40 * 64 us for every duty cycle decrement
-#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN                 8       // 8 -> 8 * 64 us for every duty cycle decrement
+#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_DEFAULT             40    // 40 -> 40 * 64 us for every duty cycle decrement
+#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN                 8     // 8 -> 8 * 64 us for every duty cycle decrement
 
 /*---------------------------------------------------------
   NOTE: regarding duty cycle (PWM) ramping
@@ -57,8 +57,8 @@
 
 
 
-#define MOTOR_OVER_SPEED_ERPS                                     520     // motor max speed, protection max value | 30 points for the sinewave at max speed
-#define MOTOR_OVER_SPEED_ERPS_EXPERIMENTAL                        700     // experimental motor speed to allow a higher cadence
+#define MOTOR_OVER_SPEED_ERPS                                     520   // motor max speed, protection max value | 30 points for the sinewave at max speed
+#define MOTOR_OVER_SPEED_ERPS_EXPERIMENTAL                        700   // experimental motor speed to allow a higher cadence
 
 #define MOTOR_ROTOR_ERPS_START_INTERPOLATION_60_DEGREES           10
 
@@ -73,8 +73,8 @@
 
 
 
-#define ADC_10_BIT_BATTERY_CURRENT_MAX                            106     // 18 amps
-#define ADC_10_BIT_MOTOR_PHASE_CURRENT_MAX                        177     // 30 amps
+#define ADC_10_BIT_BATTERY_CURRENT_MAX                            106   // 18 amps
+#define ADC_10_BIT_MOTOR_PHASE_CURRENT_MAX                        177   // 30 amps
 
 /*---------------------------------------------------------
   NOTE: regarding ADC battery current max
@@ -148,59 +148,198 @@
   adjust for the different spacings between the transitions.
 -------------------------------------------------------------------------------*/
 
+// master switch
+#define DISPLAY_VLCD_ENABLED                                      1
 
+#if DISPLAY_VLCD_ENABLED
+// display parameters (do not edit)
+#define DISPLAY_TYPE_NONE                                         0
+#define DISPLAY_TYPE_VLCD5                                        1
+#define DISPLAY_TYPE_VLCD6                                        2
 
-// Wheel speed sensor
+#define DISPLAY_VLCD_ASSIST_LEVEL_0                               0x10
+#define DISPLAY_VLCD_ASSIST_LEVEL_1                               0x40
+#define DISPLAY_VLCD_ASSIST_LEVEL_2                               0x02
+#define DISPLAY_VLCD_ASSIST_LEVEL_3                               0x04
+#define DISPLAY_VLCD_ASSIST_LEVEL_4                               0x08
+
+#define DISPLAY_VLCD_WHEEL_SPEED_ROTATION_UNIT_TIME               2.04
+
+// display
+#define DEFAULT_VALUE_DISPLAY_TYPE                                DISPLAY_TYPE_VLCD5  // DISPLAY_TYPE_NONE (TODO) | DISPLAY_TYPE_VLCD5  | DISPLAY_TYPE_VLCD6
+#define DEFAULT_VALUE_DISPLAY_CONTROL_FUNCTIONS                   1
+#define DEFAULT_VALUE_DISPLAY_ALWAYS_ON                           0
+#define DEFAULT_VALUE_DISPLAY_MOTOR_WORKING_KEEPALIVE             1
+#define DEFAULT_VALUE_DISPLAY_WHEEL_TURNING_KEEPALIVE             1
+
+// wheel speed sensor
 #define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MAX                      135   // something like 200 m/h with a 6'' wheel
 #define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MIN                      32767 // could be a bigger number but will make for a slow detection of stopped wheel speed
 
+// default values for bike wheel parameters
+#define DEFAULT_VALUE_WHEEL_PERIMETER                             2200  // size in mm, refer to: https://www.cateye.com/data/resources/Tire_size_chart_ENG_151106.pdf
+#define DEFAULT_VALUE_WHEEL_SPEED_MAX                             35    // 50 km/h
 
+// default values for battery parameters
+#define DEFAULT_VALUE_BATTERY_CURRENT_MAX                         12    // 16 amps
+#define DEFAULT_VALUE_BATTERY_TARGET_MAX_POWER                    600   // 500 watts
+#define DEFAULT_VALUE_BATTERY_CELLS_NUMBER                        14    // 36 V = 10 | 48 V = 13 | 52 V = 14
+#define DEFAULT_VALUE_BATTERY_LOW_VOLTAGE_CUT_OFF_X10             441   // 48 V battery, LVC = 39.0 (3.0 * 13) -> 390
+#define DEFAULT_VALUE_BATTERY_PACK_INTERNAL_RESISTANCE            130   // 48 V battery, 13S5P measured 130 milliohms
 
-// default values
-#define DEFAULT_VALUE_BATTERY_CURRENT_MAX                         10  // 10 amps
-#define DEFAULT_VALUE_TARGET_BATTERY_MAX_POWER_X10                50  // 500 watts
-#define DEFAULT_VALUE_BATTERY_LOW_VOLTAGE_CUT_OFF_X10_0           134 // 48 V battery, LVC = 39.0 (3.0 * 13): (134 + (1 << 8)) = 390
-#define DEFAULT_VALUE_BATTERY_LOW_VOLTAGE_CUT_OFF_X10_1           1
-#define DEFAULT_VALUE_WHEEL_PERIMETER_0                           2   // 26'' wheel: 2050 mm perimeter (2 + (8 << 8))
-#define DEFAULT_VALUE_WHEEL_PERIMETER_1                           8
-#define DEFAULT_VALUE_WHEEL_SPEED_MAX                             50  // 50 km/h
-#define DEFAULT_VALUE_MOTOR_TYPE                                  0
+// These are now defined in motor.c, do we want them here instead?
+// READ_BATTERY_VOLTAGE_FILTER_COEFFICIENT   2 
+// READ_BATTERY_CURRENT_FILTER_COEFFICIENT   2
+
+// motor type parameters (do not edit)
+#define MOTOR_TYPE_48V                                            0
+#define MOTOR_TYPE_36V                                            1
+#define MOTOR_TYPE_48V_EXPERIMENTAL_HIGH_CADENCE_MODE             2
+#define MOTOR_TYPE_36V_EXPERIMENTAL_HIGH_CADENCE_MODE             3
+
+// motor type
+#define DEFAULT_VALUE_MOTOR_TYPE                                  MOTOR_TYPE_48V 
+
+// default value pedal torque conversion
 #define DEFAULT_VALUE_PEDAL_TORQUE_PER_10_BIT_ADC_STEP_X100       67
 
-/*---------------------------------------------------------
+// default values for power assist
+#define DEFAULT_VALUE_POWER_ASSIST_LEVEL_0                        0
+#define DEFAULT_VALUE_POWER_ASSIST_LEVEL_1                        6     // 0.6
+#define DEFAULT_VALUE_POWER_ASSIST_LEVEL_2                        15    // 1.5
+#define DEFAULT_VALUE_POWER_ASSIST_LEVEL_3                        21    // 2.1
+#define DEFAULT_VALUE_POWER_ASSIST_LEVEL_4                        30    // 3.0
 
-  NOTE: regarding the torque sensor output values
+// default values for torque assist
+#define DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_0                       0
+#define DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_1                       20
+#define DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_2                       50
+#define DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_3                       70
+#define DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_4                       90
 
-  Torque (force) value needs to be found experimentaly.
-  
-  One torque sensor ADC 10 bit step is equal to 0.38 kg
-  
-  Force (Nm) = 1 Kg * 9.81 * 0.17 (0.17 = arm cranks size)
----------------------------------------------------------*/
+// default values for cadence assist
+#define DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_0                      0
+#define DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_1                      40
+#define DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_2                      70
+#define DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_3                      90
+#define DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_4                      120
 
+// default value for eMTB assist (sensitivity)
+#define DEFAULT_VALUE_eMTB_ASSIST_LEVEL_0                         0
+#define DEFAULT_VALUE_eMTB_ASSIST_LEVEL_1                         5
+#define DEFAULT_VALUE_eMTB_ASSIST_LEVEL_2                         10    // recommended starting level
+#define DEFAULT_VALUE_eMTB_ASSIST_LEVEL_3                         15
+#define DEFAULT_VALUE_eMTB_ASSIST_LEVEL_4                         20
 
+// default values for walk assist
+#define DEFAULT_VALUE_WALK_ASSIST_FUNCTION_ENABLED                1     // disabled by default
+#define DEFAULT_VALUE_WALK_ASSIST_FUNCTION_STATIC                 0     // adjustable or fixed assist level
+#define DEFAULT_VALUE_WALK_ASSIST_LEVEL_0                         0
+#define DEFAULT_VALUE_WALK_ASSIST_LEVEL_1                         25
+#define DEFAULT_VALUE_WALK_ASSIST_LEVEL_2                         40
+#define DEFAULT_VALUE_WALK_ASSIST_LEVEL_3                         44
+#define DEFAULT_VALUE_WALK_ASSIST_LEVEL_4                         48
+
+// riding mode options
+#define DEFAULT_VALUE_RIDING_MODE                                 POWER_ASSIST_MODE  // OFF_MODE | POWER_ASSIST_MODE | TORQUE_ASSIST_MODE | CADENCE_ASSIST_MODE | eMTB_ASSIST_MODE | CADENCE_SENSOR_CALIBRATION_MODE 
+#define DEFAULT_VALUE_CADENCE_SENSOR_MODE                         STANDARD_MODE     // STANDARD_MODE | ADVANCED_MODE | CALIBRATION_MODE 
+
+// default values for assist
+#define DEFAULT_VALUE_POWER_ASSIST_LEVEL                          DEFAULT_VALUE_POWER_ASSIST_LEVEL_1
+#define DEFAULT_VALUE_TORQUE_ASSIST_LEVEL                         DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_1
+#define DEFAULT_VALUE_CADENCE_ASSIST_LEVEL                        DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_1
+#define DEFAULT_VALUE_eMTB_ASSIST_LEVEL                           DEFAULT_VALUE_eMTB_ASSIST_LEVEL_1
+#define DEFAULT_VALUE_WALK_ASSIST_LEVEL                           DEFAULT_VALUE_WALK_ASSIST_LEVEL_1
+
+// default values for lights
+// #define DEFAULT_VALUE_LIGHTS_MODE                              0     // NOT REQUIRED? for display only?
+#define DEFAULT_VALUE_LIGHTS_ENABLED                              0  
+#define DEFAULT_VALUE_LIGHTS_STATE                                0     
+#define DEFAULT_VALUE_LIGHTS_CONFIGURATION                        0     // 0 = normal | 1 = flashing | etc
+
+// throttle input or temperature control
+#define DEFAULT_VALUE_OPTIONAL_ADC_FUNCTION                       NOT_IN_USE // NOT_IN_USE | TEMPERATURE_CONTROL | THROTTLE_CONTROL 
+
+// default values for motor temperature limit function
+#define DEFAULT_VALUE_MOTOR_TEMPERATURE_MIN_LIMIT                 75    // 75 degrees Celsius
+#define DEFAULT_VALUE_MOTOR_TEMPERATURE_MAX_LIMIT                 85    // 85 degrees Celsius
+
+// default value for assist without pedal rotation threshold
+#define DEFAULT_VALUE_ASSIST_WITHOUT_PEDAL_ROTATION_THRESHOLD     0
+
+// default value for motor acceleration
+#define DEFAULT_VALUE_MOTOR_ACCELERATION                          0
+
+// default values for street mode function - needs reworking
+#define DEFAULT_VALUE_STREET_MODE_FUNCTION_ENABLED                0     // disabled by default
+#define DEFAULT_VALUE_STREET_MODE_ENABLED_ON_STARTUP              0     
+#define DEFAULT_VALUE_STREET_MODE_SPEED_LIMIT                     25    // 25 km/h 
+#define DEFAULT_VALUE_STREET_MODE_POWER_LIMIT_ENABLED             0
+#define DEFAULT_VALUE_STREET_MODE_POWER_LIMIT                     250   // 250 W
+// TODO
+// #define DEFAULT_VALUE_STREET_MODE_THROTTLE_ENABLED             0     // throttle is disabled in street mode by default
+// #define DEFAULT_VALUE_STREET_MODE_CRUISE_ENABLED               0     // cruise is disabled in street mode by default
+
+// default values for cruise function
+#define DEFAULT_VALUE_CRUISE_FUNCTION_ENABLED                     0     // TO DO - disabled by default
+#define DEFAULT_VALUE_CRUISE_FUNCTION_SET_TARGET_SPEED_ENABLED    0     // disabled by default
+#define DEFAULT_VALUE_CRUISE_FUNCTION_TARGET_SPEED                25    // 25 km/h
 
 // ADC battery voltage measurement
 #define BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X512                  44
-#define BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000                 87  // conversion value verified with a cheap power meter
-
-/*---------------------------------------------------------
-  NOTE: regarding ADC battery voltage measurement
-
-  0.344 per ADC 8 bit step:
-  
-  17.9 V -->  ADC 8 bits value  = 52; 
-  40 V   -->  ADC 8 bits value  = 116; 
-  
-  This signal is atenuated by the opamp 358.
----------------------------------------------------------*/
-
-
+#define BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000                 87    // conversion value verified with a cheap power meter
 
 // ADC battery current measurement
 #define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X512                  102
-#define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100                  17  // conversion value verified with a cheap power meter
+#define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100                  17    // conversion value verified with a cheap power meter
 
+// battery levels
+#define DISPLAY_VLCD_LI_ION_CELL_VOLTS_X100_OVERVOLTAGE           425
+#define DISPLAY_VLCD_LI_ION_CELL_VOLTS_X100_UNDERVOLTAGE          300
 
+#define DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_0                    300
+#define DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_1                    325
+#define DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_2                    338
+#define DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_3                    360
+#define DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_4                    378
+#define DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_5                    393
+#define DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_6                    406
 
+#define DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_0                    300
+#define DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_1                    330
+#define DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_2                    344
+#define DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_3                    370
+#define DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_4                    396
+
+// display battery levels (do not edit)
+#define DISPLAY_VLCD5_BATTERY_LEVEL_0                             0x00
+#define DISPLAY_VLCD5_BATTERY_LEVEL_1                             0x02
+#define DISPLAY_VLCD5_BATTERY_LEVEL_2                             0x04
+#define DISPLAY_VLCD5_BATTERY_LEVEL_3                             0x06
+#define DISPLAY_VLCD5_BATTERY_LEVEL_4                             0x08
+#define DISPLAY_VLCD5_BATTERY_LEVEL_5                             0x0A
+#define DISPLAY_VLCD5_BATTERY_LEVEL_6                             0x0C
+
+#define DISPLAY_VLCD6_BATTERY_LEVEL_0                             0x00
+#define DISPLAY_VLCD6_BATTERY_LEVEL_1                             0x02
+#define DISPLAY_VLCD6_BATTERY_LEVEL_2                             0x06
+#define DISPLAY_VLCD6_BATTERY_LEVEL_3                             0x09
+#define DISPLAY_VLCD6_BATTERY_LEVEL_4                             0x0C
+
+#define DISPLAY_VLCD_ASSIST_LEVEL_0                               0x10
+#define DISPLAY_VLCD_ASSIST_LEVEL_1                               0x40
+#define DISPLAY_VLCD_ASSIST_LEVEL_2                               0x02
+#define DISPLAY_VLCD_ASSIST_LEVEL_3                               0x04
+#define DISPLAY_VLCD_ASSIST_LEVEL_4                               0x08
+
+// display fault codes, are there any more needed?
+#define DISPLAY_VLCD_FAULT_CODE_NO_FAULT                          0
+#define DISPLAY_VLCD_FAULT_CODE_TEMPERATURE_PROTECTION            6   
+#define DISPLAY_VLCD_FAULT_CODE_EBIKE_WHEEL_BLOCKED               7
+#define DISPLAY_VLCD_FAULT_CODE_OVERVOLTAGE                       8
+
+// conversion for EEPROM
+#define DEFAULT_VALUE_TARGET_BATTERY_MAX_POWER_X10                (DEFAULT_VALUE_BATTERY_TARGET_MAX_POWER / 10)
+
+#endif
 #endif // _MAIN_H_

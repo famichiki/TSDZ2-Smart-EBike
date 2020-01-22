@@ -80,6 +80,9 @@ int main (void)
   hall_sensor_init();
   EEPROM_init(); // needed for pwm_init_bipolar_4q
   pwm_init_bipolar_4q();
+  #if DISPLAY_VLCD_ENABLED
+  default_config_init();
+  #endif
   enableInterrupts();
   
   while (1)

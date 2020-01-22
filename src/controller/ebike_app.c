@@ -11,7 +11,8 @@
 #include <stdio.h>
 #include "stm8s.h"
 #include "stm8s_gpio.h"
-#include "main.h"
+// #include "main.h" // add original main.h
+#include "main.h" // change to config.h
 #include "interrupts.h"
 #include "adc.h"
 #include "motor.h"
@@ -30,8 +31,13 @@ static uint8_t    ui8_riding_mode_parameter = 0;
 static uint8_t    ui8_system_state = NO_ERROR;
 static uint8_t    ui8_motor_enabled = 1;
 static uint8_t    ui8_assist_without_pedal_rotation_threshold = 0;
-static uint8_t    ui8_lights_configuration = 10;
+static uint8_t    ui8_lights_configuration = 10; // no mode 10?
 static uint8_t    ui8_lights_state = 0;
+
+#if DISPLAY_VLCD_ENABLED
+static uint8_t    ui8_street_mode = 0;
+volatile uint8_t  ui8_fault_code = 0;
+#endif
 
 
 // power control
@@ -44,6 +50,45 @@ static uint8_t    ui8_battery_current_filtered_x10 = 0;
 static uint8_t    ui8_adc_battery_current_max = ADC_10_BIT_BATTERY_CURRENT_MAX;
 static uint8_t    ui8_adc_battery_current_target = 0;
 static uint8_t    ui8_duty_cycle_target = 0;
+
+
+// battery
+static uint16_t   ui16_battery_SOC_voltage_filtered_x1000 = 32000;
+static uint16_t   ui16_battery_SOC_current_filtered_x10 = 0;
+static uint16_t   ui16_battery_SOC_voltage_x100;
+static uint8_t    ui8_battery_SOC_step = 0;
+
+#if DISPLAY_VLCD_ENABLED
+#if DEFAULT_VALUE_DISPLAY_TYPE == DISPLAY_TYPE_VLCD5
+static const uint8_t ui8_battery_SOC_levels[10] =
+{
+  DISPLAY_VLCD5_BATTERY_LEVEL_0,
+  DISPLAY_VLCD5_BATTERY_LEVEL_0,
+  DISPLAY_VLCD5_BATTERY_LEVEL_1,
+  DISPLAY_VLCD5_BATTERY_LEVEL_2,
+  DISPLAY_VLCD5_BATTERY_LEVEL_3,
+  DISPLAY_VLCD5_BATTERY_LEVEL_4,
+  DISPLAY_VLCD5_BATTERY_LEVEL_5,
+  DISPLAY_VLCD5_BATTERY_LEVEL_6,
+  DISPLAY_VLCD5_BATTERY_LEVEL_6,
+  DISPLAY_VLCD5_BATTERY_LEVEL_6,
+};
+#elif DEFAULT_VALUE_DISPLAY_TYPE == DISPLAY_TYPE_VLCD6
+static const uint8_t ui8_battery_SOC_levels[10] =
+{
+  DISPLAY_VLCD6_BATTERY_LEVEL_0,
+  DISPLAY_VLCD6_BATTERY_LEVEL_0,
+  DISPLAY_VLCD6_BATTERY_LEVEL_1,
+  DISPLAY_VLCD6_BATTERY_LEVEL_2,
+  DISPLAY_VLCD6_BATTERY_LEVEL_3,
+  DISPLAY_VLCD6_BATTERY_LEVEL_4,
+  DISPLAY_VLCD6_BATTERY_LEVEL_4,
+  DISPLAY_VLCD6_BATTERY_LEVEL_4,
+  DISPLAY_VLCD6_BATTERY_LEVEL_4,
+  DISPLAY_VLCD6_BATTERY_LEVEL_4,
+};
+#endif
+#endif
 
 
 // brakes
@@ -124,9 +169,65 @@ uint8_t ui8_boost_enabled_and_applied = 0;
 static void apply_boost();
 
 
+#if DISPLAY_VLCD_ENABLED
+// assist levels
+static uint8_t ui8_assist_level = 0;
+
+static const uint8_t ui8_power_assist_levels[5] =
+{
+  DEFAULT_VALUE_POWER_ASSIST_LEVEL_0,
+  DEFAULT_VALUE_POWER_ASSIST_LEVEL_1,
+  DEFAULT_VALUE_POWER_ASSIST_LEVEL_2,
+  DEFAULT_VALUE_POWER_ASSIST_LEVEL_3,
+  DEFAULT_VALUE_POWER_ASSIST_LEVEL_4
+};
+
+static const uint8_t ui8_torque_assist_levels[5] =
+{
+  DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_0,
+  DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_1,
+  DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_2,
+  DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_3,
+  DEFAULT_VALUE_TORQUE_ASSIST_LEVEL_4
+};
+
+static const uint8_t ui8_cadence_assist_levels[5] =
+{
+  DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_0,
+  DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_1,
+  DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_2,
+  DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_3,
+  DEFAULT_VALUE_CADENCE_ASSIST_LEVEL_4
+};
+
+static const uint8_t ui8_emtb_assist_levels[5] =
+{
+  DEFAULT_VALUE_eMTB_ASSIST_LEVEL_0,
+  DEFAULT_VALUE_eMTB_ASSIST_LEVEL_1,
+  DEFAULT_VALUE_eMTB_ASSIST_LEVEL_2,
+  DEFAULT_VALUE_eMTB_ASSIST_LEVEL_3,
+  DEFAULT_VALUE_eMTB_ASSIST_LEVEL_4
+};
+
+static const uint8_t ui8_walk_assist_levels[5] =
+{
+  DEFAULT_VALUE_WALK_ASSIST_LEVEL_0,
+  DEFAULT_VALUE_WALK_ASSIST_LEVEL_1,
+  DEFAULT_VALUE_WALK_ASSIST_LEVEL_2,
+  DEFAULT_VALUE_WALK_ASSIST_LEVEL_3,
+  DEFAULT_VALUE_WALK_ASSIST_LEVEL_4
+};
+#endif
+
+
 // UART
+#if DISPLAY_VLCD_ENABLED
+#define UART_NUMBER_DATA_BYTES_TO_RECEIVE   4   // change this value depending on how many data bytes there are to receive ( Package = one start byte + data bytes + two bytes 16 bit CRC )
+#define UART_NUMBER_DATA_BYTES_TO_SEND      6  // change this value depending on how many data bytes there are to send ( Package = one start byte + data bytes + two bytes 16 bit CRC )
+#else
 #define UART_NUMBER_DATA_BYTES_TO_RECEIVE   7   // change this value depending on how many data bytes there are to receive ( Package = one start byte + data bytes + two bytes 16 bit CRC )
 #define UART_NUMBER_DATA_BYTES_TO_SEND      26  // change this value depending on how many data bytes there are to send ( Package = one start byte + data bytes + two bytes 16 bit CRC )
+#endif
 
 volatile uint8_t ui8_received_package_flag = 0;
 volatile uint8_t ui8_rx_buffer[UART_NUMBER_DATA_BYTES_TO_RECEIVE + 3];
@@ -145,6 +246,8 @@ static void uart_send_package (void);
 
 
 // system functions
+void default_config_init(void);
+static void calc_battery_soc(void);
 static void get_battery_voltage_filtered(void);
 static void get_battery_current_filtered(void);
 static void get_pedal_torque(void);
@@ -1355,12 +1458,16 @@ void UART2_IRQHandler(void) __interrupt(UART2_IRQHANDLER)
   }
 }
 
+
+
 static void communications_controller (void)
 {
 #ifndef DEBUG_UART
 
+#if !DISPLAY_VLCD_ENABLED
   // reset riding mode (safety)
-  ui8_riding_mode = OFF_MODE;
+  // ui8_riding_mode = OFF_MODE;
+#endif
   
   uart_receive_package ();
 
@@ -1368,6 +1475,312 @@ static void communications_controller (void)
 
 #endif
 }
+
+
+
+#if DISPLAY_VLCD_ENABLED
+static void uart_receive_package(void)
+{
+  // validation of the package data
+  ui16_crc_rx = 0;
+
+  for (ui8_i = 0; ui8_i <= UART_NUMBER_DATA_BYTES_TO_RECEIVE + 1; ui8_i++)
+  {
+    ui16_crc_rx += ui8_rx_buffer[ui8_i];
+  }
+
+  // if CRC is correct read the package (8 bit value and therefore last one byte)
+  if (ui8_rx_buffer[UART_NUMBER_DATA_BYTES_TO_RECEIVE + 2] == ui16_crc_rx)
+  {
+    switch (ui8_rx_buffer[1] & 0x5E)
+    {
+      case DISPLAY_VLCD_ASSIST_LEVEL_0: ui8_assist_level = 0; break;
+
+      case DISPLAY_VLCD_ASSIST_LEVEL_1: ui8_assist_level = 1; break;
+
+      case DISPLAY_VLCD_ASSIST_LEVEL_2: ui8_assist_level = 2; break;
+
+      case DISPLAY_VLCD_ASSIST_LEVEL_3: ui8_assist_level = 3; break;
+
+      case DISPLAY_VLCD_ASSIST_LEVEL_4: ui8_assist_level = 4; break;
+    }
+
+    ui8_riding_mode = DEFAULT_VALUE_RIDING_MODE;
+
+#if DEFAULT_VALUE_WALK_ASSIST_FUNCTION_ENABLED
+    // walk assist (must be enabled display)
+    if (ui8_rx_buffer[1] & (1 << 5)) ui8_riding_mode = WALK_ASSIST_MODE;
+#endif
+
+    // riding mode parameter
+    switch (ui8_riding_mode)
+    {
+      case POWER_ASSIST_MODE: ui8_riding_mode_parameter = ui8_power_assist_levels[ui8_assist_level]; break;
+      
+      case TORQUE_ASSIST_MODE: ui8_riding_mode_parameter = ui8_torque_assist_levels[ui8_assist_level]; break;
+      
+      case CADENCE_ASSIST_MODE: ui8_riding_mode_parameter = ui8_cadence_assist_levels[ui8_assist_level]; break;
+      
+      case eMTB_ASSIST_MODE: ui8_riding_mode_parameter = ui8_emtb_assist_levels[ui8_assist_level]; break;
+      
+      case WALK_ASSIST_MODE: ui8_riding_mode_parameter = DEFAULT_VALUE_WALK_ASSIST_FUNCTION_STATIC ? DEFAULT_VALUE_WALK_ASSIST_LEVEL : ui8_walk_assist_levels[ui8_assist_level]; break;
+      
+      // case CRUISE_MODE: break;
+
+      // case CADENCE_SENSOR_CALIBRATION_MODE: break;
+
+      default: ui8_riding_mode_parameter = 0;
+    }
+
+    // lights state
+    ui8_lights_state = DEFAULT_VALUE_LIGHTS_ENABLED ? (ui8_rx_buffer[1] & 1) : DEFAULT_VALUE_LIGHTS_STATE;
+
+    // signal that we processed the full package
+    ui8_received_package_flag = 0;
+  }
+
+  /*------------------------------------------------------------------------------------------------------------------
+
+    NOTE: regarding determining the maximum battery current
+  
+    ui8_target_battery_max_power_div25  = DEFAULT_VALUE_BATTERY_CURRENT_MAX (amps)
+    ui8_battery_current_max             = DEFAULT_VALUE_BATTERY_TARGET_MAX_POWER (watts)
+
+    Lowest of the two values will be used after filtering voltage.
+
+    Needs to be here as per original uart_receive_package() function, therefore is executed every loop,
+    also in case power limit changed during runtime (eg: user enables street mode via display).
+
+    Can't use in default_config_init() because ui16_battery_voltage_filtered_x1000 is not yet evaluated (equal to 0).
+    
+   ------------------------------------------------------------------------------------------------------------------*/
+  
+  // calculate max battery current in ADC steps from the received battery current limit
+  uint8_t ui8_adc_battery_current_max_temp_1 = ((uint16_t) ui8_battery_current_max * 100) / BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100;
+  
+  // calculate max battery current in ADC steps from the received power limit
+  uint32_t ui32_battery_current_max_x100 = ((uint32_t) m_configuration_variables.ui8_target_battery_max_power_div25 * 2500000) / ui16_battery_voltage_filtered_x1000;
+  uint8_t ui8_adc_battery_current_max_temp_2 = ui32_battery_current_max_x100 / BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100;
+  
+  // set max battery current
+  ui8_adc_battery_current_max = ui8_min(ui8_adc_battery_current_max_temp_1, ui8_adc_battery_current_max_temp_2);
+  
+  // enable UART2 receive interrupt as we are now ready to receive a new package
+  UART2->CR2 |= (1 << 5);
+}
+
+static void uart_send_package(void)
+{
+  uint16_t ui16_temp;
+  static uint8_t ui8_startup_counter = 0;
+
+  // start up byte
+  ui8_tx_buffer[0] = 0x43;
+
+  // battery state of charge
+  calc_battery_soc();
+  ui8_tx_buffer[1] = ui8_battery_SOC_levels[ui8_battery_SOC_step];
+
+  // working status
+  ui8_tx_buffer[2] = 0x00;
+
+  if (ui8_battery_SOC_step == 0)
+    ui8_tx_buffer[2] |= 0x01;
+
+  if (ui16_wheel_speed_x10 != 0)
+    ui8_tx_buffer[2] |= DEFAULT_VALUE_DISPLAY_WHEEL_TURNING_KEEPALIVE ? 0x80 : 0x00;
+
+  if (ui16_motor_get_motor_speed_erps() != 0)
+    ui8_tx_buffer[2] |= DEFAULT_VALUE_DISPLAY_MOTOR_WORKING_KEEPALIVE ? 0x40 : 0x00;
+
+  ui8_tx_buffer[2] |= DEFAULT_VALUE_DISPLAY_ALWAYS_ON ? 0x04 : (((ui16_wheel_speed_x10 != 0) || (ui16_motor_get_motor_speed_erps() != 0)) ? 0x04 : 0x00);
+
+  // no data
+  ui8_tx_buffer[3] = 0x00;
+  ui8_tx_buffer[4] = 0x00;
+
+  // extra data as fault code
+  ui8_tx_buffer[5] = DEFAULT_VALUE_DISPLAY_CONTROL_FUNCTIONS ? ui8_fault_code : DISPLAY_VLCD_FAULT_CODE_NO_FAULT;
+
+  // fault codes
+  if (ui8_battery_SOC_step == 9)
+    ui8_tx_buffer[5] = DISPLAY_VLCD_FAULT_CODE_OVERVOLTAGE;
+  else if (ui8_system_state & ERROR_MOTOR_BLOCKED)
+    ui8_tx_buffer[5] = DISPLAY_VLCD_FAULT_CODE_EBIKE_WHEEL_BLOCKED;
+   else if ((m_configuration_variables.ui8_optional_ADC_function == TEMPERATURE_CONTROL) && (ui8_temperature_current_limiting_value < 255))
+    ui8_tx_buffer[5] = DISPLAY_VLCD_FAULT_CODE_TEMPERATURE_PROTECTION;
+
+  if (ui8_startup_counter < 40)
+    ++ui8_startup_counter;
+
+  // wheel speed
+  if ((ui16_wheel_speed_x10 == 0) || (ui8_startup_counter < 40))
+  {
+    ui8_tx_buffer[6] = 0x07;
+    ui8_tx_buffer[7] = 0x07;
+  }
+  else
+  {
+    ui16_temp = (uint16_t) (1000.0 / ((float) PWM_CYCLES_SECOND / (float) ui16_wheel_speed_sensor_ticks) / DISPLAY_VLCD_WHEEL_SPEED_ROTATION_UNIT_TIME);
+
+    ui8_tx_buffer[6] = (uint8_t) (ui16_temp & 0xff);
+    ui8_tx_buffer[7] = (uint8_t) (ui16_temp >> 8);
+  }
+
+  // prepare crc of the package
+  ui16_crc_tx = 0;
+  
+  for (ui8_i = 0; ui8_i <= UART_NUMBER_DATA_BYTES_TO_SEND + 1; ui8_i++)
+  {
+    // crc16 (ui8_tx_buffer[ui8_i], &ui16_crc_tx);
+    ui16_crc_tx += ui8_tx_buffer[ui8_i];
+  }
+  
+  ui8_tx_buffer[UART_NUMBER_DATA_BYTES_TO_SEND + 2] = ui16_crc_tx;
+
+  // send the full package to UART
+  for (ui8_i = 0; ui8_i <= UART_NUMBER_DATA_BYTES_TO_SEND + 2; ui8_i++)
+  {
+    putchar (ui8_tx_buffer[ui8_i]);
+  }
+}
+
+
+
+void default_config_init(void)
+{
+  // riding mode
+  ui8_riding_mode = DEFAULT_VALUE_RIDING_MODE;
+
+  // riding mode parameter
+  switch (ui8_riding_mode)
+  {
+    case POWER_ASSIST_MODE: ui8_riding_mode_parameter = DEFAULT_VALUE_POWER_ASSIST_LEVEL; break;
+    
+    case TORQUE_ASSIST_MODE: ui8_riding_mode_parameter = DEFAULT_VALUE_TORQUE_ASSIST_LEVEL; break;
+
+    case CADENCE_ASSIST_MODE: ui8_riding_mode_parameter = DEFAULT_VALUE_CADENCE_ASSIST_LEVEL; break;
+
+    case eMTB_ASSIST_MODE: ui8_riding_mode_parameter = DEFAULT_VALUE_eMTB_ASSIST_LEVEL; break;
+    
+    // case CADENCE_SENSOR_CALIBRATION_MODE: break;
+
+    default: ui8_riding_mode_parameter = 0;
+  }
+
+  // street mode
+  ui8_street_mode = DEFAULT_VALUE_STREET_MODE_FUNCTION_ENABLED && DEFAULT_VALUE_STREET_MODE_ENABLED_ON_STARTUP;
+
+  // wheel max speed
+  m_configuration_variables.ui8_wheel_speed_max = ui8_street_mode ? DEFAULT_VALUE_STREET_MODE_SPEED_LIMIT : DEFAULT_VALUE_WHEEL_SPEED_MAX;
+
+  // wheel perimeter
+  m_configuration_variables.ui16_wheel_perimeter = DEFAULT_VALUE_WHEEL_PERIMETER;
+
+  // battery power limit
+  m_configuration_variables.ui8_target_battery_max_power_div25 = (uint8_t) ((uint16_t) DEFAULT_VALUE_BATTERY_TARGET_MAX_POWER / 25);
+
+#if DEFAULT_VALUE_STREET_MODE_POWER_LIMIT_ENABLED
+  if (ui8_street_mode)
+    m_configuration_variables.ui8_target_battery_max_power_div25 = (uint8_t) ((uint16_t) DEFAULT_VALUE_STREET_MODE_POWER_LIMIT / 25);
+#endif
+
+#if DEFAULT_VALUE_CRUISE_FUNCTION_ENABLED && DEFAULT_VALUE_CRUISE_FUNCTION_SET_TARGET_SPEED_ENABLED
+  // received target speed for cruise
+  ui16_wheel_speed_target_received_x10 = ((uint16_t) DEFAULT_VALUE_CRUISE_FUNCTION_TARGET_SPEED * 10);
+#endif
+ 
+  // battery low voltage cut off x10
+  m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 = DEFAULT_VALUE_BATTERY_LOW_VOLTAGE_CUT_OFF_X10;
+
+  // set low voltage cutoff (8 bit)
+  ui8_adc_battery_voltage_cut_off = ((uint32_t) m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 * 25) / BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000;
+
+  // type of motor (36 volt, 48 volt or some experimental type)
+  m_configuration_variables.ui8_motor_type = DEFAULT_VALUE_MOTOR_TYPE;
+
+  // motor temperature limit function or throttle
+  m_configuration_variables.ui8_optional_ADC_function = DEFAULT_VALUE_OPTIONAL_ADC_FUNCTION;
+
+  // motor over temperature min value limit
+  ui8_motor_temperature_min_value_to_limit = DEFAULT_VALUE_MOTOR_TEMPERATURE_MIN_LIMIT;
+
+  // motor over temperature max value limit
+  ui8_motor_temperature_max_value_to_limit = DEFAULT_VALUE_MOTOR_TEMPERATURE_MAX_LIMIT;
+
+  // assist without pedal rotation threshold
+  ui8_assist_without_pedal_rotation_threshold = DEFAULT_VALUE_ASSIST_WITHOUT_PEDAL_ROTATION_THRESHOLD;
+
+  // check if assist without pedal rotation threshold is valid (safety)
+  if (ui8_assist_without_pedal_rotation_threshold > 100) { ui8_assist_without_pedal_rotation_threshold = 0; }
+
+  // motor acceleration adjustment
+  uint8_t ui8_motor_acceleration_adjustment = DEFAULT_VALUE_MOTOR_ACCELERATION;
+
+  // pedal torque conversion
+  m_configuration_variables.ui8_pedal_torque_per_10_bit_ADC_step_x100 = DEFAULT_VALUE_PEDAL_TORQUE_PER_10_BIT_ADC_STEP_X100;
+
+  // cadence sensor mode
+  ui8_cadence_sensor_mode = DEFAULT_VALUE_CADENCE_SENSOR_MODE;
+
+  // lights options
+  ui8_lights_state = DEFAULT_VALUE_LIGHTS_STATE;
+  ui8_lights_configuration = DEFAULT_VALUE_LIGHTS_CONFIGURATION;
+}
+
+
+
+static void calc_battery_soc(void)
+{
+  // filter variables
+  #define FILTER_VARIABLES_COUNTER_MAX    10    // 10 -> filter every 100 ms, this matches the time it takes to receive new variables from the motor controller
+    
+  static uint8_t ui8_filter_variables_counter;
+
+  // filter variables
+  if (++ui8_filter_variables_counter > FILTER_VARIABLES_COUNTER_MAX)
+  {
+    // reset filter counter
+    ui8_filter_variables_counter = 0;
+    
+    // battery voltage
+    ui16_battery_SOC_voltage_filtered_x1000 = filter(ui16_battery_voltage_filtered_x1000, ui16_battery_SOC_voltage_filtered_x1000, 60);
+    
+    // battery current
+    ui16_battery_SOC_current_filtered_x10 = filter(ui8_battery_current_filtered_x10, ui16_battery_SOC_current_filtered_x10, 60);
+  }
+
+  // calculate battery voltage that takes internal battery pack resistance into consideration
+  uint16_t ui16_battery_voltage_internal_resistance_adjusted_x100 = ((uint32_t) DEFAULT_VALUE_BATTERY_PACK_INTERNAL_RESISTANCE * ui16_battery_SOC_current_filtered_x10) / 100;
+  
+  // add voltage value
+  ui16_battery_SOC_voltage_x100 = (ui16_battery_voltage_filtered_x1000 / 10) + ui16_battery_voltage_internal_resistance_adjusted_x100;
+  
+  // translate voltage to battery bars
+  if      (ui16_battery_SOC_voltage_x100 >= (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD_LI_ION_CELL_VOLTS_X100_OVERVOLTAGE))   { ui8_battery_SOC_step = 9; }   // overvoltage
+  else if (ui16_battery_SOC_voltage_x100 <= (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD_LI_ION_CELL_VOLTS_X100_UNDERVOLTAGE))  { ui8_battery_SOC_step = 0; }   // undervoltage
+  else
+  {
+#if DEFAULT_VALUE_DISPLAY_TYPE == DISPLAY_TYPE_VLCD5
+    if      (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_6)) { ui8_battery_SOC_step = 7; }   // 6 bars | full
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_5)) { ui8_battery_SOC_step = 6; }   // 5 bars
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_4)) { ui8_battery_SOC_step = 5; }   // 4 bars
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_3)) { ui8_battery_SOC_step = 4; }   // 3 bars
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_2)) { ui8_battery_SOC_step = 3; }   // 2 bars
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_1)) { ui8_battery_SOC_step = 2; }   // 1 bar
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD5_LI_ION_CELL_VOLTS_X100_0)) { ui8_battery_SOC_step = 1; }   // blink | empty
+#elif DEFAULT_VALUE_DISPLAY_TYPE == DISPLAY_TYPE_VLCD6
+    if      (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_4)) { ui8_battery_SOC_step = 5; }   // 4 bars | full
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_3)) { ui8_battery_SOC_step = 4; }   // 3 bars
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_2)) { ui8_battery_SOC_step = 3; }   // 2 bars
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_1)) { ui8_battery_SOC_step = 2; }   // 1 bar
+    else if (ui16_battery_SOC_voltage_x100 > (DEFAULT_VALUE_BATTERY_CELLS_NUMBER * DISPLAY_VLCD6_LI_ION_CELL_VOLTS_X100_0)) { ui8_battery_SOC_step = 1; }   // blink | empty
+#endif
+  }
+}
+#else
+
+
 
 static void uart_receive_package(void)
 {
@@ -1526,6 +1939,8 @@ static void uart_receive_package(void)
   }
 }
 
+
+
 static void uart_send_package(void)
 {
   uint16_t ui16_temp;
@@ -1630,8 +2045,7 @@ static void uart_send_package(void)
     putchar (ui8_tx_buffer[ui8_i]);
   }
 }
-
-
+#endif
 
 
 

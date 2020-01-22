@@ -39,4 +39,8 @@ typedef struct _configuration_variables
 void ebike_app_controller (void);
 struct_configuration_variables* get_configuration_variables (void);
 
+#if DISPLAY_VLCD_ENABLED
+void default_config_init (void);
+#endif
+
 #endif /* _EBIKE_APP_H_ */
