@@ -177,14 +177,14 @@
 #define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MIN                      32767 // could be a bigger number but will make for a slow detection of stopped wheel speed
 
 // default values for bike wheel parameters
-#define DEFAULT_VALUE_WHEEL_PERIMETER                             2200  // size in mm, refer to: https://www.cateye.com/data/resources/Tire_size_chart_ENG_151106.pdf
+#define DEFAULT_VALUE_WHEEL_PERIMETER                             2200  // size in mm, refer: https://www.cateye.com/data/resources/Tire_size_chart_ENG_151106.pdf
 #define DEFAULT_VALUE_WHEEL_SPEED_MAX                             35    // 50 km/h
 
 // default values for battery parameters
 #define DEFAULT_VALUE_BATTERY_CURRENT_MAX                         12    // 16 amps
 #define DEFAULT_VALUE_BATTERY_TARGET_MAX_POWER                    600   // 500 watts
 #define DEFAULT_VALUE_BATTERY_CELLS_NUMBER                        14    // 36 V = 10 | 48 V = 13 | 52 V = 14
-#define DEFAULT_VALUE_BATTERY_LOW_VOLTAGE_CUT_OFF_X10             441   // 48 V battery, LVC = 39.0 (3.0 * 13) -> 390
+#define DEFAULT_VALUE_BATTERY_LOW_VOLTAGE_CUT_OFF_X10             441   // 48 V battery, example: (3.0 V * 13 S) = 39.0 V -> 390
 #define DEFAULT_VALUE_BATTERY_PACK_INTERNAL_RESISTANCE            130   // 48 V battery, 13S5P measured 130 milliohms
 
 // These are now defined in motor.c, do we want them here instead?
@@ -271,7 +271,7 @@
 #define DEFAULT_VALUE_MOTOR_ACCELERATION                          0
 
 // default values for street mode function - needs reworking
-#define DEFAULT_VALUE_STREET_MODE_FUNCTION_ENABLED                0     // disabled by default
+#define DEFAULT_VALUE_STREET_MODE_FUNCTION_ENABLED                1     // disabled by default
 #define DEFAULT_VALUE_STREET_MODE_ENABLED_ON_STARTUP              0     
 #define DEFAULT_VALUE_STREET_MODE_SPEED_LIMIT                     25    // 25 km/h 
 #define DEFAULT_VALUE_STREET_MODE_POWER_LIMIT_ENABLED             0
@@ -286,12 +286,14 @@
 #define DEFAULT_VALUE_CRUISE_FUNCTION_TARGET_SPEED                25    // 25 km/h
 
 // ADC battery voltage measurement
-#define BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X512                  44
-#define BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000                 87    // conversion value verified with a cheap power meter
+#define DEFAULT_VALUE_IMPROVED_BATTERY_VOLTAGE_ACCURACY           1
+#define BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X10000                859   // conversion value verified with with bluetooth BMS
+#define BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000                 86    // conversion value verified with a cheap power meter (was 87 and 0.5 V too high)
+#define BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X512                  44    // (X1000 / 1000) * 512
 
 // ADC battery current measurement
-#define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X512                  102
 #define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100                  17    // conversion value verified with a cheap power meter
+#define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X512                  87    // (X100 / 100) * 512 (was incorrectly 102, refer: https://git.io/JvqlL)
 
 // battery levels
 #define DISPLAY_VLCD_LI_ION_CELL_VOLTS_X100_OVERVOLTAGE           425

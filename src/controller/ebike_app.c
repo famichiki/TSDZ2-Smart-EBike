@@ -36,6 +36,11 @@ static uint8_t    ui8_lights_state = 0;
 
 #if DISPLAY_VLCD_ENABLED
 static uint8_t    ui8_street_mode = 0;
+static uint8_t    ui8_lights_state_old = 0;
+static uint8_t    ui8_riding_mode_old = 0;
+static uint8_t    ui8_menu_page = 0;
+static uint8_t    ui8_menu_item = 0;
+static uint8_t    ui8_menu_item_changed = 0;
 volatile uint8_t  ui8_fault_code = 0;
 #endif
 
@@ -1000,7 +1005,11 @@ static void calc_cadence(void)
 
 static void get_battery_voltage_filtered(void)
 {
+#if DISPLAY_VLCD_ENABLED && DEFAULT_VALUE_IMPROVED_BATTERY_VOLTAGE_ACCURACY
+  ui16_battery_voltage_filtered_x1000 = ((uint32_t) ui16_adc_battery_voltage_filtered * BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X10000) / 10;
+#else
   ui16_battery_voltage_filtered_x1000 = ui16_adc_battery_voltage_filtered * BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000;
+#endif
 }
 
 
@@ -1505,11 +1514,124 @@ static void uart_receive_package(void)
       case DISPLAY_VLCD_ASSIST_LEVEL_4: ui8_assist_level = 4; break;
     }
 
-    ui8_riding_mode = DEFAULT_VALUE_RIDING_MODE;
+    // lights state
+    // default state 'on' interferes with menus, maybe check for state from display instead?
+    // ui8_lights_state = DEFAULT_VALUE_LIGHTS_ENABLED ? (ui8_rx_buffer[1] & 1) : DEFAULT_VALUE_LIGHTS_STATE;
+    ui8_lights_state = (ui8_rx_buffer[1] & 1);
+
+#if DEFAULT_VALUE_DISPLAY_CONTROL_FUNCTIONS
+    // lights switched on, display the selection menus
+    if (ui8_lights_state && !ui8_lights_state_old && !ui8_menu_page)
+    {
+      ui8_menu_page = ui8_assist_level;
+    }
+
+    // display menu and adjust settings
+    switch (ui8_menu_page)
+    {
+      // assist level 1: riding mode selection (1 - 4)
+      case 1:
+        if ((ui8_menu_page == ui8_assist_level) && !ui8_menu_item_changed)
+        {
+          ui8_menu_item = ui8_riding_mode;
+        }
+        else
+        {
+          if (ui8_assist_level)
+          {
+            // adjust setting with assist level
+            ui8_menu_item = ui8_assist_level;
+          }
+          else
+          {
+            // disregard changes when assist level 0
+            ui8_menu_item = ui8_riding_mode;
+          }
+
+          // lights switched off, save the settings
+          if (!ui8_lights_state && ui8_lights_state_old)
+          {
+            ui8_riding_mode = ui8_menu_item;
+          }
+
+          ui8_menu_item_changed = 1;
+        }
+        break;
+
+      // assist level 2: street mode toggle (off = 1 | on = 2)
+      case 2:
+        if ((ui8_menu_page == ui8_assist_level) && !ui8_menu_item_changed)
+        {
+          ui8_menu_item = ui8_street_mode + 1;
+        }
+        else
+        {
+          if (ui8_assist_level)
+          {
+            if (ui8_assist_level <= 2)
+            {
+              // adjust setting with assist level
+              ui8_menu_item = ui8_assist_level;
+            }
+          }
+          else
+          {
+            // disregard changes when assist level 0
+            ui8_menu_item = ui8_street_mode + 1;
+          }
+
+          // lights switched off, save the settings
+          if (!ui8_lights_state && ui8_lights_state_old)
+          {
+            ui8_street_mode = ui8_menu_item - 1;
+          }
+
+          ui8_menu_item_changed = 1;
+        }
+        break;
+
+      // assist level 3: another setting
+      case 3:
+        ui8_menu_page = 0;
+        break;
+
+      // assist level 4: another setting
+      case 4:
+        ui8_menu_page = 0;
+        break;
+
+      default:
+        ui8_menu_page = 0;
+        break;
+    }
+
+    // lights switched off, clear the menu
+    if (!ui8_lights_state && ui8_lights_state_old && ui8_menu_page) 
+    {
+        ui8_menu_page = 0;
+        ui8_menu_item = 0;
+        ui8_menu_item_changed = 0;
+    }
+
+    // display selected menu item
+    ui8_fault_code = ui8_menu_item;
+    ui8_lights_state_old = ui8_lights_state;
+#endif
 
 #if DEFAULT_VALUE_WALK_ASSIST_FUNCTION_ENABLED
-    // walk assist (must be enabled display)
-    if (ui8_rx_buffer[1] & (1 << 5)) ui8_riding_mode = WALK_ASSIST_MODE;
+    // walk assist (must be enabled on display)
+    if (ui8_rx_buffer[1] & (1 << 5)) 
+    {
+      ui8_riding_mode = WALK_ASSIST_MODE;
+    }
+    else if (ui8_riding_mode == WALK_ASSIST_MODE)
+    {
+      ui8_riding_mode = ui8_riding_mode_old;
+    }
+    else
+    {
+      ui8_riding_mode_old = ui8_riding_mode;
+    }
 #endif
 
     // riding mode parameter
@@ -1531,9 +1653,6 @@ static void uart_receive_package(void)
 
       default: ui8_riding_mode_parameter = 0;
     }
-
-    // lights state
-    ui8_lights_state = DEFAULT_VALUE_LIGHTS_ENABLED ? (ui8_rx_buffer[1] & 1) : DEFAULT_VALUE_LIGHTS_STATE;
 
     // signal that we processed the full package
     ui8_received_package_flag = 0;
@@ -1694,7 +1813,11 @@ void default_config_init(void)
   m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 = DEFAULT_VALUE_BATTERY_LOW_VOLTAGE_CUT_OFF_X10;
 
   // set low voltage cutoff (8 bit)
-  ui8_adc_battery_voltage_cut_off = ((uint32_t) m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 * 25) / BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000;
+#if DEFAULT_VALUE_IMPROVED_BATTERY_VOLTAGE_ACCURACY
+  ui8_adc_battery_voltage_cut_off = (uint8_t) ((uint32_t) ((m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 * 1000) / BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X10000) / 4); 
+#else
+  ui8_adc_battery_voltage_cut_off = (uint8_t) ((uint32_t) m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 * 25) / BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000; 
+#endif
 
   // type of motor (36 volt, 48 volt or some experimental type)
   m_configuration_variables.ui8_motor_type = DEFAULT_VALUE_MOTOR_TYPE;
